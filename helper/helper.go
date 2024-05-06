@@ -14,6 +14,10 @@ import (
 	"github.com/jchawla2804/golang-slack-event-listener/model"
 )
 
+const (
+	Base_Url = "https://anypoint.mulesoft.com/"
+)
+
 func GetToken(username, password string) (interface{}, error) {
 	log.Println("Retrieve Token Details")
 	tokenDetails := model.Authorization{}
@@ -29,7 +33,7 @@ func GetToken(username, password string) (interface{}, error) {
 		return "", err
 	}
 
-	resp, err := http.Post("https://anypoint.mulesoft.com/accounts/login", "application/json", bytes.NewBuffer(dataInBytes))
+	resp, err := http.Post(Base_Url+"accounts/login", "application/json", bytes.NewBuffer(dataInBytes))
 
 	if err != nil {
 		log.Print(err.Error())
@@ -37,7 +41,7 @@ func GetToken(username, password string) (interface{}, error) {
 
 	}
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("Status code is not correct")
+		err = fmt.Errorf("status code is not correct")
 		log.Println(resp.StatusCode)
 		b, _ := io.ReadAll(resp.Body)
 		log.Println(string(b))
@@ -56,7 +60,7 @@ func GetPlatformInformation(token string) (model.AnypointPlatform, error) {
 	platformDetails := model.AnypointPlatform{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", "https://anypoint.mulesoft.com/accounts/api/me", nil)
+	req, err := http.NewRequest("GET", Base_Url+"accounts/api/me", nil)
 	if err != nil {
 		log.Print(err.Error())
 		return platformDetails, err
@@ -71,7 +75,7 @@ func GetPlatformInformation(token string) (model.AnypointPlatform, error) {
 
 	if resp.StatusCode != 200 {
 		log.Printf("Status code is different %d", resp.StatusCode)
-		return platformDetails, errors.New("error Recieved while calling api")
+		return platformDetails, errors.New("error recieved while calling api")
 	}
 	defer resp.Body.Close()
 	json.NewDecoder(resp.Body).Decode(&platformDetails)
@@ -86,7 +90,7 @@ func GetAppDetails(token string, envName string) (string, error) {
 	appDetails := []model.ApplicationDetails{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", "https://anypoint.mulesoft.com/cloudhub/api/v2/applications", nil)
+	req, err := http.NewRequest("GET", Base_Url+"/cloudhub/api/v2/applications", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,7 +107,7 @@ func GetAppDetails(token string, envName string) (string, error) {
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("Status code is not correct")
+		err = fmt.Errorf("status code is not correct")
 		log.Println(resp.StatusCode)
 		b, _ := io.ReadAll(resp.Body)
 		log.Println(string(b))
@@ -131,9 +135,9 @@ func ChangeAppStatus(status string, token string, envName string, appName string
 		"status": status,
 	}
 
-	dataInBytes, err := json.Marshal(body)
+	dataInBytes, _ := json.Marshal(body)
 
-	req, err := http.NewRequest("POST", "https://anypoint.mulesoft.com/cloudhub/api/applications/"+appName+"/status", bytes.NewBuffer(dataInBytes))
+	req, err := http.NewRequest("POST", Base_Url+"cloudhub/api/applications/"+appName+"/status", bytes.NewBuffer(dataInBytes))
 	if err != nil {
 		log.Fatal(err)
 		return false, err
@@ -152,9 +156,8 @@ func ChangeAppStatus(status string, token string, envName string, appName string
 	defer resp.Body.Close()
 
 	byte, _ := io.ReadAll(resp.Body)
-	log.Printf(string(byte))
 	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("It Failed to Update the status")
+		return false, fmt.Errorf("status update failed %s", string(byte))
 	}
 
 	return true, nil
@@ -168,7 +171,7 @@ func GetAssetInfo(token string) (string, error) {
 	assetDetails := []model.AssetInformation{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", "https://anypoint.mulesoft.com/exchange/api/v1/assets", nil)
+	req, err := http.NewRequest("GET", Base_Url+"exchange/api/v1/assets", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -187,7 +190,7 @@ func GetAssetInfo(token string) (string, error) {
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("Status code is not correct")
+		err = fmt.Errorf("status code is not correct")
 		log.Println(resp.StatusCode)
 		b, _ := io.ReadAll(resp.Body)
 		log.Println(string(b))
@@ -213,7 +216,7 @@ func ListEnvironments(token string) (string, error) {
 	envDetails := model.ListOfEnv{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", "https://anypoint.mulesoft.com/accounts/api/organizations/"+os.Getenv("ANYPOINT_ORG_ID")+"/environments", nil)
+	req, err := http.NewRequest("GET", Base_Url+"accounts/api/organizations/"+os.Getenv("ANYPOINT_ORG_ID")+"/environments", nil)
 	if err != nil {
 		log.Print(err.Error())
 		return "", err
@@ -228,7 +231,7 @@ func ListEnvironments(token string) (string, error) {
 
 	if resp.StatusCode != 200 {
 		log.Printf("Status code is different %d", resp.StatusCode)
-		return "", errors.New("Error Recieved while calling api")
+		return "", errors.New("error Recieved while calling api")
 	}
 	defer resp.Body.Close()
 	json.NewDecoder(resp.Body).Decode(&envDetails)
@@ -248,7 +251,7 @@ func DownloadAsset(token string, assetName string) (string, error) {
 	specificAssetDetails := model.AssetDownload{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", "https://anypoint.mulesoft.com/exchange/api/v1/assets/"+os.Getenv("ANYPOINT_ORG_ID")+"/"+assetName, nil)
+	req, err := http.NewRequest("GET", Base_Url+"exchange/api/v1/assets/"+os.Getenv("ANYPOINT_ORG_ID")+"/"+assetName, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -261,7 +264,7 @@ func DownloadAsset(token string, assetName string) (string, error) {
 
 	if resp.StatusCode != 200 {
 		log.Printf("The Staus code is %d", resp.StatusCode)
-		return "", errors.New("Status code is note correct")
+		return "", errors.New("status code is note correct")
 	}
 
 	defer resp.Body.Close()
@@ -283,7 +286,7 @@ func DownloadAsset(token string, assetName string) (string, error) {
 	defer out.Close()
 	_, err = io.Copy(out, fileresp.Body)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Print(err.Error())
 		return "", err
 	}
 

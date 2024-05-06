@@ -36,7 +36,7 @@ func HandleSlackEventMessage(event slackevents.EventsAPIEvent, slackClient *slac
 			}
 		}
 	default:
-		return errors.New("Unsupported Event Type")
+		return errors.New("unsupported event type")
 	}
 	return nil
 }
@@ -87,12 +87,12 @@ func HandleSlackCommands(slackClient *slack.Client, command slack.SlashCommand) 
 			_, err := helper.ChangeAppStatus(listOfOptions[0], token, listOfOptions[2], listOfOptions[1])
 
 			if err != nil {
-				log.Printf(err.Error())
+				log.Print(err.Error())
 				return err
 			}
 			slackAttachment := slack.Attachment{
 				Text:    "Status Of API " + listOfOptions[1] + " has changed to " + listOfOptions[0],
-				Pretext: fmt.Sprintf("Status has changed"),
+				Pretext: "Status has changed",
 			}
 
 			_, _, err = slackClient.PostMessage(os.Getenv("CHANNEL_ID"), slack.MsgOptionAttachments(slackAttachment))
@@ -117,7 +117,7 @@ func HandleSlackCommands(slackClient *slack.Client, command slack.SlashCommand) 
 
 		slackAttachment := slack.Attachment{
 			Text:    response,
-			Pretext: fmt.Sprintf("Asset Information"),
+			Pretext: "Asset Information",
 		}
 
 		_, _, err = slackClient.PostMessage(os.Getenv("CHANNEL_ID"), slack.MsgOptionAttachments(slackAttachment))
@@ -150,6 +150,9 @@ func HandleSlackCommands(slackClient *slack.Client, command slack.SlashCommand) 
 			return errors.New("Please login again")
 		}
 		fileName, err := helper.DownloadAsset(token, command.Text)
+		if err != nil {
+			return err
+		}
 		slackUploadParam := slack.FileUploadParameters{
 			Channels: []string{command.ChannelID},
 			File:     fileName,
@@ -188,21 +191,9 @@ func HandleSlackAppMentions(appMentionEvent *slackevents.AppMentionEvent, slackC
 		slack.NewActionBlock("actionblock789", buttonBlockElement1),
 	}
 
-	// buttonBlockElement := slack.NewButtonBlockElement("button", "basic-auth", &slack.TextBlockObject{Text: "Login Via username of password", Type: slack.PlainTextType})
-
-	// accessory := slack.NewAccessory(buttonBlockElement)
-
-	// blockSet := []slack.Block{
-	// 	slack.NewSectionBlock(
-	// 		textBlockObject,
-	// 		nil,
-	// 		nil,
-	// 	),
-	// }
-
 	if strings.Contains(text, "hello") {
-		slackAttachment.Text = fmt.Sprintf("Welcome To MuleSoft slack bot ")
-		slackAttachment.Color = fmt.Sprint("#4af030")
+		slackAttachment.Text = "Welcome To MuleSoft slack bot "
+		slackAttachment.Color = "#4af030"
 		//slackAttachment.Pretext = fmt.Sprint("Greetings")
 
 	} else {
@@ -261,21 +252,21 @@ func HandleLogin(slackClient *slack.Client, username, password string) error {
 	if err != nil {
 		slackAttachment := slack.Attachment{
 			Text:    "ERROR",
-			Pretext: fmt.Sprintf("Invalid username/password"),
+			Pretext: "Invalid username/password",
 		}
 		slackClient.PostMessage(os.Getenv("CHANNEL_ID"), slack.MsgOptionAttachments(slackAttachment))
-		return errors.New("Unable To login")
+		return errors.New("unable To login")
 	}
 
 	platformDetails, err := helper.GetPlatformInformation(token.(string))
 	if err != nil {
-		fmt.Errorf("Error Retrieving Platform information")
-		return errors.New("Error Retrieving Platform information")
+		fmt.Print("error retrieving Platform information")
+		return errors.New("error Retrieving Platform information")
 	}
 
 	err = cacheClient.Add("access_token", token, 3600*time.Second)
 	if err != nil {
-		return errors.New("Error Occured while caching token")
+		return errors.New("error Occured while caching token")
 	}
 	slackActionAttachmentOption := []slack.AttachmentActionOption{}
 
@@ -289,7 +280,7 @@ func HandleLogin(slackClient *slack.Client, username, password string) error {
 
 	slackAttachment := slack.Attachment{
 
-		Pretext: fmt.Sprintf("You are logged in to platform. Choose The Business Group "),
+		Pretext: "You are logged in to platform. Choose The Business Group ",
 		Actions: []slack.AttachmentAction{
 			{
 				Options: slackActionAttachmentOption,
@@ -300,17 +291,6 @@ func HandleLogin(slackClient *slack.Client, username, password string) error {
 		},
 	}
 
-	// slackSelect := slack.SelectBlockElement{
-	// 	Type:        string(slack.OptTypeStatic),
-	// 	Placeholder: &slack.TextBlockObject{Type: slack.PlainTextType, Type: "Select Business Group"},
-	// }
-
-	// blockSet := []slack.Block{
-	// 	slack.NewSectionBlock(&slack.TextBlockObject{Type: slack.MarkdownType, Text: "Select Business Group"}, nil),
-	// }
-
-	//v, _ := json.Marshal(slackAttachment)
-	//log.Print(string(v))
 	slackClient.PostMessage(os.Getenv("CHANNEL_ID"), slack.MsgOptionAttachments(slackAttachment))
 	return nil
 }
