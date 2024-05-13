@@ -76,16 +76,46 @@ func main() {
 					if !ok {
 						log.Fatal("Cound not typecast event")
 					}
+
 					switch callbackEvent.Type {
+
+					// case for block actions
 					case slack.InteractionTypeBlockActions:
 						socketClient.Ack(*event.Request)
-						err = events.HandleInteractiveDialogBoxEvent(slackClient, callbackEvent.ActionCallback.BlockActions[0].Value, callbackEvent.TriggerID)
-						if err != nil {
-							log.Fatal(err.Error())
+
+						actiontype := callbackEvent.ActionCallback.BlockActions[0].Type
+
+						switch actiontype {
+						case slack.ActionType(slack.OptTypeStatic):
+							err := events.HandlePlatformInformation(slackClient, callbackEvent.ActionCallback.BlockActions[0].SelectedOption.Text.Text, callbackEvent.ActionCallback.BlockActions[0].SelectedOption.Value)
+							if err != nil {
+								log.Fatal(err.Error())
+							}
+
+						default:
+							err = events.HandleInteractiveDialogBoxEvent(slackClient, callbackEvent.ActionCallback.BlockActions[0].Value, callbackEvent.TriggerID)
+							if err != nil {
+								log.Fatal(err.Error())
+							}
+
 						}
+
+					// case Submission events
 					case slack.InteractionTypeViewSubmission:
 						socketClient.Ack(*event.Request)
-						err = events.HandleLogin(slackClient, callbackEvent.View.State.Values["username"]["user"].Value, callbackEvent.View.State.Values["password"]["pass"].Value)
+						var username, password, typeOfAuth string
+
+						if callbackEvent.View.State.Values["username"]["user"].Value == "" {
+							username = callbackEvent.View.State.Values["clientId"]["clientId"].Value
+							password = callbackEvent.View.State.Values["clientSecret"]["clientSecret"].Value
+							typeOfAuth = "oauth"
+						} else {
+							username = callbackEvent.View.State.Values["username"]["user"].Value
+							password = callbackEvent.View.State.Values["password"]["pass"].Value
+							typeOfAuth = "basic-auth"
+						}
+
+						err = events.HandleLogin(slackClient, username, password, typeOfAuth)
 						if err != nil {
 							log.Println(err.Error())
 						}

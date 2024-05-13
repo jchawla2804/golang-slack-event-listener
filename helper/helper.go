@@ -18,13 +18,37 @@ const (
 	Base_Url = "https://anypoint.mulesoft.com/"
 )
 
-func GetToken(username, password string) (interface{}, error) {
+// GetToken retrieves the token details based on the type of authentication.
+// It takes the username, password, and typeOfAuth as input parameters.
+// It returns the token details and an error if any.
+func GetToken(username, password, typeOfAuth string) (interface{}, error) {
 	log.Println("Retrieve Token Details")
 	tokenDetails := model.Authorization{}
-	body := map[string]string{
-		"username": username,
-		"password": password,
+	var authurl string
+	var body map[string]string
+
+	switch typeOfAuth {
+	case "basic-auth":
+		body = map[string]string{
+			"username": username,
+			"password": password,
+		}
+
+		authurl = Base_Url + "accounts/login"
+
+	case "oauth":
+		body = map[string]string{
+			"client_id":     username,
+			"client_secret": password,
+			"grant_type":    "client_credentials",
+		}
+		authurl = Base_Url + "accounts/api/v2/oauth2/token"
+
+	default:
+		return "", errors.New("invalid Auth Type")
 	}
+
+	log.Println(authurl)
 
 	dataInBytes, err := json.Marshal(body)
 
@@ -33,7 +57,7 @@ func GetToken(username, password string) (interface{}, error) {
 		return "", err
 	}
 
-	resp, err := http.Post(Base_Url+"accounts/login", "application/json", bytes.NewBuffer(dataInBytes))
+	resp, err := http.Post(authurl, "application/json", bytes.NewBuffer(dataInBytes))
 
 	if err != nil {
 		log.Print(err.Error())
@@ -56,6 +80,9 @@ func GetToken(username, password string) (interface{}, error) {
 
 }
 
+// GetPlatformInformation retrieves the platform information based on the token.
+// It takes the token as an input parameter.
+// It returns the platform details and an error if any.
 func GetPlatformInformation(token string) (model.AnypointPlatform, error) {
 	platformDetails := model.AnypointPlatform{}
 	httpClient := &http.Client{}
@@ -83,10 +110,10 @@ func GetPlatformInformation(token string) (model.AnypointPlatform, error) {
 	return platformDetails, nil
 }
 
-/*
-Get Status of all applications deployed in a mulesoft environment
-*/
-func GetAppDetails(token string, envName string) (string, error) {
+// GetAppDetails retrieves the status of all applications deployed in a MuleSoft environment.
+// It takes the token, envId, and orgId as input parameters.
+// It returns the application details and an error if any.
+func GetAppDetails(token string, envId, orgId string) (string, error) {
 	appDetails := []model.ApplicationDetails{}
 	httpClient := &http.Client{}
 
@@ -94,9 +121,10 @@ func GetAppDetails(token string, envName string) (string, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	req.Header.Add("Authorization", "Bearer "+token)
-	req.Header.Add("X-ANYPNT-ORG-ID", os.Getenv("ANYPOINT_ORG_ID"))
-	req.Header.Add("X-ANYPNT-ENV-ID", model.ListofEnvId[envName])
+	req.Header.Add("X-ANYPNT-ORG-ID", orgId)
+	req.Header.Add("X-ANYPNT-ENV-ID", envId)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -126,10 +154,10 @@ func GetAppDetails(token string, envName string) (string, error) {
 
 }
 
-/*
-Change app status whether to stop, start or restart
-*/
-func ChangeAppStatus(status string, token string, envName string, appName string) (bool, error) {
+// ChangeAppStatus changes the status of an application (stop, start, restart).
+// It takes the status, token, envId, orgId, and appName as input parameters.
+// It returns a boolean indicating the success of the status change and an error if any.
+func ChangeAppStatus(status string, token string, envId, orgId string, appName string) (bool, error) {
 	httpClient := &http.Client{}
 	body := map[string]string{
 		"status": status,
@@ -143,8 +171,8 @@ func ChangeAppStatus(status string, token string, envName string, appName string
 		return false, err
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
-	req.Header.Add("X-ANYPNT-ORG-ID", os.Getenv("ANYPOINT_ORG_ID"))
-	req.Header.Add("X-ANYPNT-ENV-ID", model.ListofEnvId[envName])
+	req.Header.Add("X-ANYPNT-ORG-ID", orgId)
+	req.Header.Add("X-ANYPNT-ENV-ID", envId)
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(req)
@@ -164,9 +192,9 @@ func ChangeAppStatus(status string, token string, envName string, appName string
 
 }
 
-/*
-Get List of all assets
-*/
+// GetAssetInfo retrieves the information of all assets.
+// It takes the token as an input parameter.
+// It returns the asset details and an error if any.
 func GetAssetInfo(token string) (string, error) {
 	assetDetails := []model.AssetInformation{}
 	httpClient := &http.Client{}
@@ -209,49 +237,44 @@ func GetAssetInfo(token string) (string, error) {
 
 }
 
-/*
-List all the environments in mulesoft business group
-*/
-func ListEnvironments(token string) (string, error) {
+// ListEnvironments lists all the environments in a MuleSoft business group.
+// It takes the token and orgId as input parameters.
+// It returns the list of environments and an error if any.
+func ListEnvironments(token, orgId string) (model.ListOfEnv, error) {
 	envDetails := model.ListOfEnv{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", Base_Url+"accounts/api/organizations/"+os.Getenv("ANYPOINT_ORG_ID")+"/environments", nil)
+	req, err := http.NewRequest("GET", Base_Url+"accounts/api/organizations/"+orgId+"/environments", nil)
 	if err != nil {
 		log.Print(err.Error())
-		return "", err
+		return model.ListOfEnv{}, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Print(err.Error())
-		return "", err
+		return model.ListOfEnv{}, err
 	}
 
 	if resp.StatusCode != 200 {
 		log.Printf("Status code is different %d", resp.StatusCode)
-		return "", errors.New("error Recieved while calling api")
+		return model.ListOfEnv{}, errors.New("error Recieved while calling api")
 	}
 	defer resp.Body.Close()
 	json.NewDecoder(resp.Body).Decode(&envDetails)
 
-	var concatenatedString []string
-	for _, v := range envDetails.Data {
-		concatenatedString = append(concatenatedString, fmt.Sprintf("Env-Name : %s\n Env-Id : %s\n Is-Production : %v", v.Name, v.ID, v.IsProduction))
-	}
-
-	return strings.Join(concatenatedString, "\n\n"), nil
+	return envDetails, nil
 }
 
-/*
-Download any asset from anypoint exchange
-*/
-func DownloadAsset(token string, assetName string) (string, error) {
+// DownloadAsset downloads an asset from Anypoint Exchange.
+// It takes the token, orgid, and assetName as input parameters.
+// It returns the downloaded asset file name and an error if any.
+func DownloadAsset(token string, orgid, assetName string) (string, error) {
 	specificAssetDetails := model.AssetDownload{}
 	httpClient := &http.Client{}
 
-	req, err := http.NewRequest("GET", Base_Url+"exchange/api/v1/assets/"+os.Getenv("ANYPOINT_ORG_ID")+"/"+assetName, nil)
+	req, err := http.NewRequest("GET", Base_Url+"exchange/api/v1/assets/"+orgid+"/"+assetName, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
